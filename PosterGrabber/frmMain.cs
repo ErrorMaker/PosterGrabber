@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Tangine;
 using Sulakore.Communication;
+using System.Text.RegularExpressions;
 
 namespace PosterGrabber
 {
@@ -21,6 +22,9 @@ namespace PosterGrabber
         private ushort movePoster = 0;
         private ushort placePoster = 0;
         public override bool IsRemoteModule => true;
+        private static string movePattern = @":w=(-?[0-9]+),(-?[0-9]+) l=(-?[0-9]+),(-?[0-9]+) ([l|r])";
+        private static string placePattern = @"([0-9]+) :w=(-?[0-9]+),(-?[0-9]+) l=(-?[0-9]+),(-?[0-9]+) ([l|r])";
+        private Regex r;
 
         public frmMain()
         {
@@ -38,19 +42,43 @@ namespace PosterGrabber
 
         private void MovePoster(DataInterceptedEventArgs e)
         {
+            r = new Regex(movePattern, RegexOptions.IgnoreCase);
+
             int posterId = e.Packet.ReadInteger();
             string posterLoc = e.Packet.ReadString();
 
-            txtInject.Text += "{l}{u:" + movePoster + "}{i:" + posterId + "}{s:" + posterLoc + "}\r\n";
+            numId.Value = posterId;
+
+            Match m = Regex.Match(posterLoc, movePattern, RegexOptions.IgnoreCase);
+            if (m.Success)
+            {
+                numW1.Value = int.Parse(m.Groups[1].Value);
+                numW2.Value = int.Parse(m.Groups[2].Value);
+                numL1.Value = int.Parse(m.Groups[3].Value);
+                numL2.Value = int.Parse(m.Groups[4].Value);
+                cmbRot.Text = m.Groups[5].Value;
+            }
         }
 
         private void PlacePoster(DataInterceptedEventArgs e)
         {
             string posterData = e.Packet.ReadString();
-            string posterId = posterData.Substring(0, posterData.IndexOf(' '));
-            string posterLoc = posterData.Substring(posterData.IndexOf(' ') + 1, posterData.Length - (posterData.IndexOf(' ')+1));
 
-            txtInject.Text += "{l}{u:" + movePoster + "}{i:" + posterId + "}{s:" + posterLoc + "}\r\n";
+            Match m = Regex.Match(posterData, placePattern, RegexOptions.IgnoreCase);
+            if (m.Success)
+            {
+                numId.Value = int.Parse(m.Groups[1].Value);
+                numW1.Value = int.Parse(m.Groups[2].Value);
+                numW2.Value = int.Parse(m.Groups[3].Value);
+                numL1.Value = int.Parse(m.Groups[4].Value);
+                numL2.Value = int.Parse(m.Groups[5].Value);
+                cmbRot.Text = m.Groups[6].Value;
+            }
+        }
+
+        private void btnMovePoster_Click(object sender, EventArgs e)
+        {
+            Connection.SendToServerAsync(movePoster, (int)numId.Value, $":w={numW1.Value},{numW2.Value} l={numL1.Value},{numL2.Value} {cmbRot.Text}");
         }
     }
 }
